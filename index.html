@@ -218,8 +218,13 @@
             // Load saved history
             loadHistory();
 
-            // Long press / Click handler for destination
+            // Click handler for destination
             map.on('click', function(e) {
+                setDestination(e.latlng);
+            });
+            
+            // Context menu (Long press) handler for destination
+            map.on('contextmenu', function(e) {
                 setDestination(e.latlng);
             });
 
@@ -419,15 +424,18 @@
 
             // Use Nominatim (OSM Geocoding)
             // Limit to Japan for better relevance
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=jp&limit=1`;
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=jp&limit=1&addressdetails=1`;
 
             try {
                 const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Geocoding server error: ${response.status}`);
+                }
                 const data = await response.json();
 
                 if (data && data.length > 0) {
-                    const destLat = data[0].lat;
-                    const destLon = data[0].lon;
+                    const destLat = parseFloat(data[0].lat);
+                    const destLon = parseFloat(data[0].lon);
                     const destLatLng = L.latLng(destLat, destLon);
                     
                     setDestination(destLatLng);
@@ -438,7 +446,7 @@
                 }
             } catch (e) {
                 console.error(e);
-                alert("検索エラーが発生しました。");
+                alert("検索中にエラーが発生しました。ネットワーク接続を確認してください。");
                 statusBox.textContent = "エラー";
             }
         }
@@ -487,6 +495,13 @@
                     styles: [{color: 'blue', opacity: 0.6, weight: 6}]
                 }
             }).addTo(map);
+
+            // Add error handling for the routing service
+            routeControl.on('routingerror', function(e) {
+                console.error('Routing error:', e);
+                // OSRM demo server frequently returns 429 Too Many Requests or 400
+                alert("ルート検索に失敗しました。サーバーが混雑しているか、ルートが見つかりません。");
+            });
         }
 
         // --- Wake Lock (Prevent Screen Sleep) ---
